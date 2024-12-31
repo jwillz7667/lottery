@@ -1,0 +1,6 @@
+crew-ai>=0.1.0
+anthropic>=0.7.0
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+fastapi>=0.100.0
+uvicorn>=0.23.0 

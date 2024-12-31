@@ -1,173 +1,101 @@
-import axios, { AxiosInstance } from 'axios';
-import { notify } from '../utils/notifications';
+import axios from 'axios';
 
-// Types
-interface User {
-  id: number;
-  email: string;
-  ethAddress: string;
-  promptCredits: number;
-  createdAt: string;
-}
+const instance = axios.create({
+    baseURL: 'http://localhost:5001/api',
+    headers: {
+        'Content-Type': 'application/json'
+    }
+});
 
-interface Transaction {
-  id: number;
-  userId: number;
-  txHash: string;
-  amountEth: number;
-  status: 'pending' | 'confirmed' | 'failed';
-  transactionType: 'credit_purchase' | 'payout';
-  createdAt: string;
-}
+// Request interceptor
+instance.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
 
-interface Prompt {
-  id: number;
-  userId: number;
-  promptText: string;
-  response: string | null;
-  status: 'pending' | 'completed' | 'failed';
-  createdAt: string;
-}
+// Response interceptor
+instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        console.error('API Error:', error.response?.data || error.message);
+        throw error;
+    }
+);
 
-interface LotteryPot {
-  currentPot: number;
-  participantCount: number;
-  lastWinner: {
-    userId: number;
-    promptText: string;
-    amountWon: number;
-    timestamp: string;
-  } | null;
-}
+export const api = {
+    // Auth
+    login: async (email: string, password: string) => {
+        try {
+            const response = await instance.post('/auth/login', { email, password });
+            return response.data;
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error;
+        }
+    },
+    register: async (email: string, password: string) => {
+        try {
+            const response = await instance.post('/auth/register', { email, password });
+            return response.data;
+        } catch (error) {
+            console.error('Registration error:', error);
+            throw error;
+        }
+    },
 
-interface UserStats {
-  totalParticipations: number;
-  totalWinnings: number;
-  bestPrompt: {
-    promptText: string;
-    amountWon: number;
-    timestamp: string;
-  } | null;
-}
+    // User
+    getUserStats: async () => {
+        try {
+            const response = await instance.get('/user/stats');
+            return response.data;
+        } catch (error) {
+            console.error('Get user stats error:', error);
+            throw error;
+        }
+    },
 
-// API Service Class
-class ApiService {
-  private api: AxiosInstance;
-  private token: string | null = null;
+    // Chat
+    getChatHistory: async () => {
+        try {
+            const response = await instance.get('/chat/history');
+            return response.data;
+        } catch (error) {
+            console.error('Get chat history error:', error);
+            throw error;
+        }
+    },
+    submitPrompt: async (prompt: string) => {
+        try {
+            const response = await instance.post('/chat/prompt', { prompt });
+            return response.data;
+        } catch (error) {
+            console.error('Submit prompt error:', error);
+            throw error;
+        }
+    },
 
-  constructor() {
-    this.api = axios.create({
-      baseURL: import.meta.env.VITE_API_URL,
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    // Lottery
+    getCurrentPot: async () => {
+        try {
+            const response = await instance.get('/lottery/current');
+            return response.data;
+        } catch (error) {
+            console.error('Get current pot error:', error);
+            throw error;
+        }
+    },
 
-    // Add response interceptor for error handling
-    this.api.interceptors.response.use(
-      response => response,
-      error => {
-        const message = error.response?.data?.error?.message || 'An error occurred';
-        notify.error(message);
-        return Promise.reject(error);
-      }
-    );
-  }
-
-  // Set auth token
-  setToken(token: string) {
-    this.token = token;
-    this.api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  }
-
-  // Clear auth token
-  clearToken() {
-    this.token = null;
-    delete this.api.defaults.headers.common['Authorization'];
-  }
-
-  // Auth endpoints
-  async register(email: string, password: string, ethAddress: string) {
-    const response = await this.api.post('/api/v1/auth/register', {
-      email,
-      password,
-      ethAddress,
-    });
-    return response.data;
-  }
-
-  async login(email: string, password: string) {
-    const response = await this.api.post('/api/v1/auth/login', {
-      email,
-      password,
-    });
-    return response.data;
-  }
-
-  async verifyToken() {
-    const response = await this.api.get('/api/v1/auth/verify');
-    return response.data;
-  }
-
-  // Transaction endpoints
-  async createTransaction(txHash: string, amountEth: number, transactionType: 'credit_purchase' | 'payout') {
-    const response = await this.api.post('/api/v1/transactions', {
-      txHash,
-      amountEth,
-      transactionType,
-    });
-    return response.data;
-  }
-
-  async getTransactionStatus(txHash: string) {
-    const response = await this.api.get(`/api/v1/transactions/${txHash}`);
-    return response.data;
-  }
-
-  async getUserTransactions() {
-    const response = await this.api.get('/api/v1/transactions/user');
-    return response.data;
-  }
-
-  // Prompt endpoints
-  async submitPrompt(promptText: string) {
-    const response = await this.api.post('/api/v1/prompts', {
-      promptText,
-    });
-    return response.data;
-  }
-
-  async getPromptStatus(id: number) {
-    const response = await this.api.get(`/api/v1/prompts/${id}`);
-    return response.data;
-  }
-
-  async getUserPrompts() {
-    const response = await this.api.get('/api/v1/prompts/user');
-    return response.data;
-  }
-
-  // Lottery endpoints
-  async getCurrentPot() {
-    const response = await this.api.get('/api/v1/lottery/pot');
-    return response.data;
-  }
-
-  async getUserStats() {
-    const response = await this.api.get('/api/v1/lottery/stats');
-    return response.data;
-  }
-}
-
-// Create and export singleton instance
-export const api = new ApiService();
-
-// Export types
-export type {
-  User,
-  Transaction,
-  Prompt,
-  LotteryPot,
-  UserStats,
+    // Payments
+    purchaseCredits: async (amount: number) => {
+        try {
+            const response = await instance.post('/payments/purchase', { amount });
+            return response.data;
+        } catch (error) {
+            console.error('Purchase credits error:', error);
+            throw error;
+        }
+    }
 }; 

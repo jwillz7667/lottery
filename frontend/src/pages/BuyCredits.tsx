@@ -1,68 +1,77 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { DashboardLayout } from '../components/layouts/DashboardLayout';
-import { CreditPurchase } from '../components/Payment/CreditPurchase';
-import { payments } from '../services/api';
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { useAuthStore } from '../context/authStore';
+import { api } from '../services/api';
 
-export const BuyCredits: React.FC = () => {
-  const { data: transactions } = useQuery(['transactions'], payments.getTransactions);
+const CREDIT_PACKAGES = [
+    { credits: 10, price: 0.01 },
+    { credits: 50, price: 0.04 },
+    { credits: 100, price: 0.07 }
+];
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <CreditPurchase />
+export const BuyCredits = () => {
+    const [selectedPackage, setSelectedPackage] = useState(CREDIT_PACKAGES[0]);
+    const user = useAuthStore((state) => state.user);
 
-        {/* Recent Transactions */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h2 className="text-lg font-medium text-gray-900">Recent Transactions</h2>
-          </div>
-          <div className="border-t border-gray-200">
-            <div className="divide-y divide-gray-200">
-              {transactions?.slice(0, 5).map((tx) => (
-                <div key={tx.id} className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <p className="text-sm font-medium text-indigo-600">
-                        {tx.transaction_type === 'credit_purchase'
-                          ? 'Credit Purchase'
-                          : 'Payout'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(tx.created_at).toLocaleString()}
-                      </p>
+    const mutation = useMutation({
+        mutationFn: () => api.purchaseCredits(selectedPackage.credits),
+        onSuccess: () => {
+            alert('Credits purchased successfully!');
+        }
+    });
+
+    const handlePurchase = () => {
+        mutation.mutate();
+    };
+
+    return (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="bg-white shadow sm:rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        Buy Credits
+                    </h3>
+                    <div className="mt-2 max-w-xl text-sm text-gray-500">
+                        <p>Current Credits: {user?.credits || 0}</p>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm font-medium text-gray-900">
-                        {tx.amount_eth} ETH
-                      </span>
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          tx.status === 'confirmed'
-                            ? 'bg-green-100 text-green-800'
-                            : tx.status === 'failed'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {tx.status}
-                      </span>
+
+                    <div className="mt-5 space-y-4">
+                        {CREDIT_PACKAGES.map((pkg) => (
+                            <div
+                                key={pkg.credits}
+                                className={`relative rounded-lg border p-4 cursor-pointer ${
+                                    selectedPackage === pkg
+                                        ? 'border-indigo-600 bg-indigo-50'
+                                        : 'border-gray-300'
+                                }`}
+                                onClick={() => setSelectedPackage(pkg)}
+                            >
+                                <div className="flex justify-between">
+                                    <div>
+                                        <h4 className="text-sm font-medium text-gray-900">
+                                            {pkg.credits} Credits
+                                        </h4>
+                                        <p className="mt-1 text-sm text-gray-500">
+                                            Best for {pkg.credits} prompts
+                                        </p>
+                                    </div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                        {pkg.price} ETH
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500 font-mono truncate">
-                    {tx.tx_hash}
-                  </p>
+
+                    <button
+                        onClick={handlePurchase}
+                        disabled={mutation.isPending}
+                        className="mt-5 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                        {mutation.isPending ? 'Processing...' : 'Purchase Credits'}
+                    </button>
                 </div>
-              ))}
-              {!transactions?.length && (
-                <div className="px-4 py-4 sm:px-6 text-center text-gray-500">
-                  No transactions yet
-                </div>
-              )}
             </div>
-          </div>
         </div>
-      </div>
-    </DashboardLayout>
-  );
+    );
 }; 
